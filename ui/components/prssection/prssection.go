@@ -21,7 +21,7 @@ import (
 const SectionType = "pr"
 
 type Model struct {
-	section.Model
+	section.BaseModel
 	Prs []data.PullRequestData
 }
 
@@ -32,7 +32,7 @@ func NewModel(
 	lastUpdated time.Time,
 ) Model {
 	m := Model{}
-	m.Model = section.NewModel(
+	m.BaseModel = section.NewModel(
 		id,
 		ctx,
 		cfg.ToSectionConfig(),
@@ -166,7 +166,7 @@ func (m Model) Update(msg tea.Msg) (section.Section, tea.Cmd) {
 			m.PageInfo = &msg.PageInfo
 			m.Table.SetIsLoading(false)
 			m.Table.SetRows(m.BuildRows())
-			m.UpdateLastUpdated(time.Now())
+			m.Table.UpdateLastUpdated(time.Now())
 			m.UpdateTotalItemsCount(m.TotalCount)
 		}
 	}
@@ -211,14 +211,56 @@ func GetSectionColumns(
 	ciLayout := config.MergeColumnConfigs(dLayout.Ci, sLayout.Ci)
 	linesLayout := config.MergeColumnConfigs(dLayout.Lines, sLayout.Lines)
 
+	if !ctx.Config.Theme.Ui.Table.Compact {
+		return []table.Column{
+			{
+				Title:  "",
+				Width:  utils.IntPtr(3),
+				Hidden: stateLayout.Hidden,
+			},
+			{
+				Title:  "Title",
+				Grow:   utils.BoolPtr(true),
+				Hidden: titleLayout.Hidden,
+			},
+			{
+				Title:  "Assignees",
+				Width:  assigneesLayout.Width,
+				Hidden: assigneesLayout.Hidden,
+			},
+			{
+				Title:  "Base",
+				Width:  baseLayout.Width,
+				Hidden: baseLayout.Hidden,
+			},
+			{
+				Title:  "󰯢",
+				Width:  utils.IntPtr(4),
+				Hidden: reviewStatusLayout.Hidden,
+			},
+			{
+				Title:  "",
+				Width:  &ctx.Styles.PrSection.CiCellWidth,
+				Grow:   new(bool),
+				Hidden: ciLayout.Hidden,
+			},
+			{
+				Title:  "",
+				Width:  linesLayout.Width,
+				Hidden: linesLayout.Hidden,
+			},
+			{
+				Title:  "",
+				Width:  updatedAtLayout.Width,
+				Hidden: updatedAtLayout.Hidden,
+			},
+		}
+	}
+
 	return []table.Column{
 		{
-			Title:  "",
-			Width:  updatedAtLayout.Width,
-			Hidden: updatedAtLayout.Hidden,
-		},
-		{
 			Title:  "",
+			Width:  utils.IntPtr(3),
 			Hidden: stateLayout.Hidden,
 		},
 		{
@@ -262,10 +304,15 @@ func GetSectionColumns(
 			Width:  linesLayout.Width,
 			Hidden: linesLayout.Hidden,
 		},
+		{
+			Title:  "",
+			Width:  updatedAtLayout.Width,
+			Hidden: updatedAtLayout.Hidden,
+		},
 	}
 }
 
-func (m *Model) BuildRows() []table.Row {
+func (m Model) BuildRows() []table.Row {
 	var rows []table.Row
 	currItem := m.Table.GetCurrItem()
 	for i, currPr := range m.Prs {
@@ -373,9 +420,7 @@ func (m *Model) FetchNextPageSectionRows() []tea.Cmd {
 
 func (m *Model) ResetRows() {
 	m.Prs = nil
-	m.Table.Rows = nil
-	m.ResetPageInfo()
-	m.Table.ResetCurrItem()
+	m.BaseModel.ResetRows()
 }
 
 func FetchAllSections(
