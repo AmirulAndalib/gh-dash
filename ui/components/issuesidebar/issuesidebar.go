@@ -17,12 +17,19 @@ import (
 	"github.com/dlvhdr/gh-dash/v4/ui/markdown"
 )
 
+var (
+	htmlCommentRegex  = regexp.MustCompile("(?U)<!--(.|[[:space:]])*-->")
+	lineCleanupRegex  = regexp.MustCompile(`((\n)+|^)([^\r\n]*\|[^\r\n]*(\n)?)+`)
+	commentPrompt     = "Leave a comment..."
+)
+
 type Model struct {
 	ctx       *context.ProgramContext
 	issue     *issue.Issue
 	sectionId int
 	width     int
 
+	ShowConfirmCancel bool
 	isCommenting  bool
 	isAssigning   bool
 	isUnassigning bool
@@ -66,9 +73,22 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 				return m, cmd
 
 			case tea.KeyEsc, tea.KeyCtrlC:
-				m.inputBox.Blur()
-				m.isCommenting = false
-				return m, nil
+				if !m.ShowConfirmCancel {
+					m.shouldCancelComment()
+				}
+			default:
+				if msg.String() == "Y" || msg.String() == "y" {
+					if m.shouldCancelComment() {
+						return m, nil
+					}
+				}
+				if m.ShowConfirmCancel && (msg.String() == "N" || msg.String() == "n") {
+					m.inputBox.SetPrompt(commentPrompt)
+					m.ShowConfirmCancel = false
+					return m, nil
+				}
+				m.inputBox.SetPrompt(commentPrompt)
+				m.ShowConfirmCancel = false
 			}
 
 			m.inputBox, taCmd = m.inputBox.Update(msg)
@@ -179,11 +199,9 @@ func (m *Model) renderStatusPill() string {
 
 func (m *Model) renderBody() string {
 	width := m.getIndentedContentWidth()
-	regex := regexp.MustCompile("(?U)<!--(.|[[:space:]])*-->")
-	body := regex.ReplaceAllString(m.issue.Data.Body, "")
-
-	regex = regexp.MustCompile(`((\n)+|^)([^\r\n]*\|[^\r\n]*(\n)?)+`)
-	body = regex.ReplaceAllString(body, "")
+	// Strip HTML comments from body and cleanup body.
+	body := htmlCommentRegex.ReplaceAllString(m.issue.Data.Body, "")
+	body = lineCleanupRegex.ReplaceAllString(body, "")
 
 	body = strings.TrimSpace(body)
 	if body == "" {
@@ -240,7 +258,23 @@ func (m *Model) GetIsCommenting() bool {
 	return m.isCommenting
 }
 
+func (m *Model) shouldCancelComment() bool {
+	if !m.ShowConfirmCancel {
+		m.inputBox.SetPrompt(lipgloss.NewStyle().Foreground(m.ctx.Theme.ErrorText).Render("Discard comment? (y/N)"))
+		m.ShowConfirmCancel = true
+		return false
+	}
+	m.inputBox.Blur()
+	m.isCommenting = false
+	m.ShowConfirmCancel = false
+	return true
+}
+
 func (m *Model) SetIsCommenting(isCommenting bool) tea.Cmd {
+	if m.issue == nil {
+		return nil
+	}
+
 	if !m.isCommenting && isCommenting {
 		m.inputBox.Reset()
 	}
@@ -258,6 +292,10 @@ func (m *Model) GetIsAssigning() bool {
 }
 
 func (m *Model) SetIsAssigning(isAssigning bool) tea.Cmd {
+	if m.issue == nil {
+		return nil
+	}
+
 	if !m.isAssigning && isAssigning {
 		m.inputBox.Reset()
 	}
@@ -287,6 +325,10 @@ func (m *Model) GetIsUnassigning() bool {
 }
 
 func (m *Model) SetIsUnassigning(isUnassigning bool) tea.Cmd {
+	if m.issue == nil {
+		return nil
+	}
+
 	if !m.isUnassigning && isUnassigning {
 		m.inputBox.Reset()
 	}

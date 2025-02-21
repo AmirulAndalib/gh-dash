@@ -13,6 +13,7 @@ import (
 	"github.com/shurcooL/githubv4"
 
 	"github.com/dlvhdr/gh-dash/v4/config"
+	"github.com/dlvhdr/gh-dash/v4/ui/theme"
 )
 
 type PullRequestData struct {
@@ -22,15 +23,17 @@ type PullRequestData struct {
 	Author struct {
 		Login string
 	}
-	UpdatedAt      time.Time
-	Url            string
-	State          string
-	Mergeable      string
-	ReviewDecision string
-	Additions      int
-	Deletions      int
-	HeadRefName    string
-	BaseRefName    string
+	AuthorAssociation     string
+	UpdatedAt             time.Time
+	CreatedAt             time.Time
+	Url                   string
+	State                 string
+	Mergeable             string
+	ReviewDecision        string
+	Additions             int
+	Deletions             int
+	HeadRefName           string
+	BaseRefName           string
 	HeadRepository struct {
 		Name string
 	}
@@ -133,7 +136,8 @@ type Review struct {
 }
 
 type Reviews struct {
-	Nodes []Review
+	TotalCount int
+	Nodes      []Review
 }
 
 type ReviewThreads struct {
@@ -165,6 +169,14 @@ type PageInfo struct {
 	EndCursor   string
 }
 
+func (data PullRequestData) GetAuthor(theme theme.Theme, showAuthorIcon bool) string {
+	author := data.Author.Login
+	if showAuthorIcon {
+		author += fmt.Sprintf(" %s", GetAuthorRoleIcon(data.AuthorAssociation, theme))
+	}
+	return author
+}
+
 func (data PullRequestData) GetTitle() string {
 	return data.Title
 }
@@ -183,6 +195,10 @@ func (data PullRequestData) GetUrl() string {
 
 func (data PullRequestData) GetUpdatedAt() time.Time {
 	return data.UpdatedAt
+}
+
+func (data PullRequestData) GetCreatedAt() time.Time {
+	return data.CreatedAt
 }
 
 func makePullRequestsQuery(query string) string {

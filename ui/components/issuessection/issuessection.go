@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/dlvhdr/gh-dash/v4/config"
@@ -13,6 +14,7 @@ import (
 	"github.com/dlvhdr/gh-dash/v4/ui/components/table"
 	"github.com/dlvhdr/gh-dash/v4/ui/constants"
 	"github.com/dlvhdr/gh-dash/v4/ui/context"
+	"github.com/dlvhdr/gh-dash/v4/ui/keys"
 	"github.com/dlvhdr/gh-dash/v4/utils"
 )
 
@@ -28,6 +30,7 @@ func NewModel(
 	ctx *context.ProgramContext,
 	cfg config.IssuesSectionConfig,
 	lastUpdated time.Time,
+	createdAt time.Time,
 ) Model {
 	m := Model{}
 	m.BaseModel = section.NewModel(
@@ -40,6 +43,7 @@ func NewModel(
 			Singular:    m.GetItemSingularForm(),
 			Plural:      m.GetItemPluralForm(),
 			LastUpdated: lastUpdated,
+			CreatedAt:   createdAt,
 		},
 	)
 	m.Issues = []data.IssueData{}
@@ -99,6 +103,23 @@ func (m Model) Update(msg tea.Msg) (section.Section, tea.Cmd) {
 				return &m, tea.Batch(cmd, blinkCmd)
 			}
 			break
+		}
+
+		switch {
+
+		case key.Matches(msg, keys.IssueKeys.ToggleSmartFiltering):
+			if !m.HasRepoNameInConfiguredFilter() {
+				m.IsFilteredByCurrentRemote = !m.IsFilteredByCurrentRemote
+			}
+			searchValue := m.GetSearchValue()
+			if m.SearchValue != searchValue {
+				m.SearchValue = searchValue
+				m.SearchBar.SetValue(searchValue)
+				m.SetIsSearching(false)
+				m.ResetRows()
+				return &m, tea.Batch(m.FetchNextPageSectionRows()...)
+			}
+
 		}
 
 	case UpdateIssueMsg:
@@ -166,6 +187,10 @@ func GetSectionColumns(
 		dLayout.UpdatedAt,
 		sLayout.UpdatedAt,
 	)
+	createdAtLayout := config.MergeColumnConfigs(
+		dLayout.CreatedAt,
+		sLayout.CreatedAt,
+	)
 	stateLayout := config.MergeColumnConfigs(dLayout.State, sLayout.State)
 	repoLayout := config.MergeColumnConfigs(dLayout.Repo, sLayout.Repo)
 	titleLayout := config.MergeColumnConfigs(dLayout.Title, sLayout.Title)
@@ -220,9 +245,14 @@ func GetSectionColumns(
 			Hidden: reactionsLayout.Hidden,
 		},
 		{
-			Title:  "",
+			Title:  "󱦻",
 			Width:  updatedAtLayout.Width,
 			Hidden: updatedAtLayout.Hidden,
+		},
+		{
+			Title:  "󱡢",
+			Width:  createdAtLayout.Width,
+			Hidden: createdAtLayout.Hidden,
 		},
 	}
 }
@@ -230,7 +260,7 @@ func GetSectionColumns(
 func (m Model) BuildRows() []table.Row {
 	var rows []table.Row
 	for _, currIssue := range m.Issues {
-		issueModel := issue.Issue{Ctx: m.Ctx, Data: currIssue}
+		issueModel := issue.Issue{Ctx: m.Ctx, Data: currIssue, ShowAuthorIcon: m.ShowAuthorIcon}
 		rows = append(rows, issueModel.ToTableRow())
 	}
 
@@ -336,7 +366,11 @@ func FetchAllSections(
 			ctx,
 			sectionConfig,
 			time.Now(),
+			time.Now(),
 		) // 0 is the search section
+		if sectionConfig.Layout.CreatorIcon.Hidden != nil {
+			sectionModel.ShowAuthorIcon = !*sectionConfig.Layout.CreatorIcon.Hidden
+		}
 		sections = append(sections, &sectionModel)
 		fetchIssuesCmds = append(
 			fetchIssuesCmds,

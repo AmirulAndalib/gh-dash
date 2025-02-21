@@ -20,6 +20,7 @@ type PullRequest struct {
 	Data    *data.PullRequestData
 	Branch  git.Branch
 	Columns []table.Column
+	ShowAuthorIcon bool
 }
 
 func (pr *PullRequest) getTextStyle() lipgloss.Style {
@@ -43,6 +44,10 @@ func (pr *PullRequest) renderReviewStatus() string {
 			pr.Ctx.Theme.ErrorText,
 		)
 		return reviewCellStyle.Render("󰌑")
+	}
+
+	if pr.Data.LatestReviews.TotalCount > 0 {
+		return reviewCellStyle.Render(pr.Ctx.Styles.Common.CommentGlyph)
 	}
 
 	return reviewCellStyle.Render(pr.Ctx.Styles.Common.WaitingGlyph)
@@ -191,7 +196,7 @@ func (pr *PullRequest) renderExtendedTitle(isSelected bool) string {
 		baseStyle = baseStyle.Foreground(pr.Ctx.Theme.SecondaryText).Background(pr.Ctx.Theme.SelectedBackground)
 	}
 
-	author := baseStyle.Render(fmt.Sprintf("@%s", pr.Data.Author.Login))
+	author := baseStyle.Render(fmt.Sprintf("@%s", pr.Data.GetAuthor(pr.Ctx.Theme, pr.ShowAuthorIcon)))
 	top := lipgloss.JoinHorizontal(lipgloss.Top, pr.Data.Repository.NameWithOwner, fmt.Sprintf(" #%d by %s", pr.Data.Number, author))
 	branchHidden := pr.Ctx.Config.Defaults.Layout.Prs.Base.Hidden
 	if branchHidden == nil || !*branchHidden {
@@ -213,7 +218,7 @@ func (pr *PullRequest) renderExtendedTitle(isSelected bool) string {
 }
 
 func (pr *PullRequest) renderAuthor() string {
-	return pr.getTextStyle().Render(pr.Data.Author.Login)
+	return pr.getTextStyle().Render(pr.Data.GetAuthor(pr.Ctx.Theme, pr.ShowAuthorIcon))
 }
 
 func (pr *PullRequest) renderAssignees() string {
@@ -257,6 +262,28 @@ func (pr *PullRequest) renderUpdateAt() string {
 	}
 
 	return pr.getTextStyle().Foreground(pr.Ctx.Theme.FaintText).Render(updatedAtOutput)
+}
+
+func (pr *PullRequest) renderCreatedAt() string {
+	timeFormat := pr.Ctx.Config.Defaults.DateFormat
+
+	createdAtOutput := ""
+	t := pr.Branch.CreatedAt
+	if pr.Data != nil {
+		t = &pr.Data.CreatedAt
+	}
+
+	if t == nil {
+		return ""
+	}
+
+	if timeFormat == "" || timeFormat == "relative" {
+		createdAtOutput = utils.TimeElapsed(*t)
+	} else {
+		createdAtOutput = t.Format(timeFormat)
+	}
+
+	return pr.getTextStyle().Foreground(pr.Ctx.Theme.FaintText).Render(createdAtOutput)
 }
 
 func (pr *PullRequest) renderBaseName() string {
@@ -307,6 +334,7 @@ func (pr *PullRequest) ToTableRow(isSelected bool) table.Row {
 			pr.renderCiStatus(),
 			pr.renderLines(isSelected),
 			pr.renderUpdateAt(),
+			pr.renderCreatedAt(),
 		}
 	}
 
@@ -321,6 +349,7 @@ func (pr *PullRequest) ToTableRow(isSelected bool) table.Row {
 		pr.renderCiStatus(),
 		pr.renderLines(isSelected),
 		pr.renderUpdateAt(),
+		pr.renderCreatedAt(),
 	}
 }
 

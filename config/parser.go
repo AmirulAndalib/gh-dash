@@ -68,8 +68,10 @@ type ColumnConfig struct {
 
 type PrsLayoutConfig struct {
 	UpdatedAt    ColumnConfig `yaml:"updatedAt,omitempty"`
+	CreatedAt    ColumnConfig `yaml:"createdAt,omitempty"`
 	Repo         ColumnConfig `yaml:"repo,omitempty"`
 	Author       ColumnConfig `yaml:"author,omitempty"`
+	AuthorIcon   ColumnConfig `yaml:"authorIcon,omitempty"`
 	Assignees    ColumnConfig `yaml:"assignees,omitempty"`
 	Title        ColumnConfig `yaml:"title,omitempty"`
 	Base         ColumnConfig `yaml:"base,omitempty"`
@@ -80,14 +82,16 @@ type PrsLayoutConfig struct {
 }
 
 type IssuesLayoutConfig struct {
-	UpdatedAt ColumnConfig `yaml:"updatedAt,omitempty"`
-	State     ColumnConfig `yaml:"state,omitempty"`
-	Repo      ColumnConfig `yaml:"repo,omitempty"`
-	Title     ColumnConfig `yaml:"title,omitempty"`
-	Creator   ColumnConfig `yaml:"creator,omitempty"`
-	Assignees ColumnConfig `yaml:"assignees,omitempty"`
-	Comments  ColumnConfig `yaml:"comments,omitempty"`
-	Reactions ColumnConfig `yaml:"reactions,omitempty"`
+	UpdatedAt   ColumnConfig `yaml:"updatedAt,omitempty"`
+	CreatedAt   ColumnConfig `yaml:"createdAt,omitempty"`
+	State       ColumnConfig `yaml:"state,omitempty"`
+	Repo        ColumnConfig `yaml:"repo,omitempty"`
+	Title       ColumnConfig `yaml:"title,omitempty"`
+	Creator     ColumnConfig `yaml:"creator,omitempty"`
+	CreatorIcon ColumnConfig `yaml:"creatorIcon,omitempty"`
+	Assignees   ColumnConfig `yaml:"assignees,omitempty"`
+	Comments    ColumnConfig `yaml:"comments,omitempty"`
+	Reactions   ColumnConfig `yaml:"reactions,omitempty"`
 }
 
 type LayoutConfig struct {
@@ -141,6 +145,15 @@ type Pager struct {
 
 type HexColor string
 
+type ColorThemeIcon struct {
+	NewContributor HexColor `yaml:"newcontributor"   validate:"omitempty,hexcolor"`
+	Contributor    HexColor `yaml:"contributor"      validate:"omitempty,hexcolor"`
+	Collaborator   HexColor `yaml:"collaborator"     validate:"omitempty,hexcolor"`
+	Member         HexColor `yaml:"member"           validate:"omitempty,hexcolor"`
+	Owner          HexColor `yaml:"owner"            validate:"omitempty,hexcolor"`
+	UnknownRole    HexColor `yaml:"unknownrole"      validate:"omitempty,hexcolor"`
+}
+
 type ColorThemeText struct {
 	Primary   HexColor `yaml:"primary"   validate:"omitempty,hexcolor"`
 	Secondary HexColor `yaml:"secondary" validate:"omitempty,hexcolor"`
@@ -162,6 +175,7 @@ type ColorThemeBackground struct {
 }
 
 type ColorTheme struct {
+	Icon       ColorThemeIcon       `yaml:"icon"       validate:"required"`
 	Text       ColorThemeText       `yaml:"text"       validate:"required"`
 	Background ColorThemeBackground `yaml:"background" validate:"required"`
 	Border     ColorThemeBorder     `yaml:"border"     validate:"required"`
@@ -169,6 +183,19 @@ type ColorTheme struct {
 
 type ColorThemeConfig struct {
 	Inline ColorTheme `yaml:",inline"`
+}
+
+type IconTheme struct {
+	NewContributor string `yaml:"newcontributor,omitempty"`
+	Contributor    string `yaml:"contributor,omitempty"`
+	Collaborator   string `yaml:"collaborator,omitempty"`
+	Member         string `yaml:"member,omitempty"`
+	Owner          string `yaml:"owner,omitempty"`
+	UnknownRole    string `yaml:"unknownrole,omitempty"`
+}
+
+type IconThemeConfig struct {
+	Inline IconTheme `yaml:",inline"`
 }
 
 type TableUIThemeConfig struct {
@@ -184,18 +211,21 @@ type UIThemeConfig struct {
 type ThemeConfig struct {
 	Ui     UIThemeConfig     `yaml:"ui,omitempty"     validate:"omitempty"`
 	Colors *ColorThemeConfig `yaml:"colors,omitempty" validate:"omitempty"`
+	Icons  *IconThemeConfig  `yaml:"icons,omitempty" validate:"omitempty"`
 }
 
 type Config struct {
-	PRSections     []PrsSectionConfig    `yaml:"prSections"`
-	IssuesSections []IssuesSectionConfig `yaml:"issuesSections"`
-	Repo           RepoConfig            `yaml:"repo"`
-	Defaults       Defaults              `yaml:"defaults"`
-	Keybindings    Keybindings           `yaml:"keybindings"`
-	RepoPaths      map[string]string     `yaml:"repoPaths"`
-	Theme          *ThemeConfig          `yaml:"theme,omitempty" validate:"omitempty"`
-	Pager          Pager                 `yaml:"pager"`
-	ConfirmQuit    bool                  `yaml:"confirmQuit"`
+	PRSections             []PrsSectionConfig    `yaml:"prSections"`
+	IssuesSections         []IssuesSectionConfig `yaml:"issuesSections"`
+	Repo                   RepoConfig            `yaml:"repo"`
+	Defaults               Defaults              `yaml:"defaults"`
+	Keybindings            Keybindings           `yaml:"keybindings"`
+	RepoPaths              map[string]string     `yaml:"repoPaths"`
+	Theme                  *ThemeConfig          `yaml:"theme,omitempty" validate:"omitempty"`
+	Pager                  Pager                 `yaml:"pager"`
+	ConfirmQuit            bool                  `yaml:"confirmQuit"`
+	ShowAuthorIcons        bool                  `yaml:"showAuthorIcons"`
+	SmartFilteringAtLaunch bool                  `yaml:"smartFilteringAtLaunch" default:"true"`
 }
 
 type configError struct {
@@ -222,11 +252,17 @@ func (parser ConfigParser) getDefaultConfig() Config {
 					UpdatedAt: ColumnConfig{
 						Width: utils.IntPtr(lipgloss.Width("2mo  ")),
 					},
+					CreatedAt: ColumnConfig{
+						Width: utils.IntPtr(lipgloss.Width("2mo  ")),
+					},
 					Repo: ColumnConfig{
 						Width: utils.IntPtr(20),
 					},
 					Author: ColumnConfig{
 						Width: utils.IntPtr(15),
+					},
+					AuthorIcon: ColumnConfig{
+						Hidden: utils.BoolPtr(false),
 					},
 					Assignees: ColumnConfig{
 						Width:  utils.IntPtr(20),
@@ -244,11 +280,17 @@ func (parser ConfigParser) getDefaultConfig() Config {
 					UpdatedAt: ColumnConfig{
 						Width: utils.IntPtr(lipgloss.Width("2mo  ")),
 					},
+					CreatedAt: ColumnConfig{
+						Width: utils.IntPtr(lipgloss.Width("2mo  ")),
+					},
 					Repo: ColumnConfig{
 						Width: utils.IntPtr(15),
 					},
 					Creator: ColumnConfig{
 						Width: utils.IntPtr(10),
+					},
+					CreatorIcon: ColumnConfig{
+						Hidden: utils.BoolPtr(false),
 					},
 					Assignees: ColumnConfig{
 						Width:  utils.IntPtr(20),
@@ -304,7 +346,9 @@ func (parser ConfigParser) getDefaultConfig() Config {
 				},
 			},
 		},
-		ConfirmQuit: false,
+		ConfirmQuit:            false,
+		ShowAuthorIcons:        true,
+		SmartFilteringAtLaunch: true,
 	}
 }
 
@@ -337,7 +381,6 @@ func (parser ConfigParser) writeDefaultConfigContents(
 	newConfigFile *os.File,
 ) error {
 	_, err := newConfigFile.WriteString(parser.getDefaultConfigYamlContents())
-
 	if err != nil {
 		return err
 	}

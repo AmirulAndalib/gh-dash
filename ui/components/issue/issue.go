@@ -16,6 +16,7 @@ import (
 type Issue struct {
 	Ctx  *context.ProgramContext
 	Data data.IssueData
+	ShowAuthorIcon bool
 }
 
 func (issue *Issue) ToTableRow() table.Row {
@@ -28,6 +29,7 @@ func (issue *Issue) ToTableRow() table.Row {
 		issue.renderNumComments(),
 		issue.renderNumReactions(),
 		issue.renderUpdateAt(),
+		issue.renderCreatedAt(),
 	}
 }
 
@@ -48,6 +50,19 @@ func (issue *Issue) renderUpdateAt() string {
 	return issue.getTextStyle().Render(updatedAtOutput)
 }
 
+func (issue *Issue) renderCreatedAt() string {
+	timeFormat := issue.Ctx.Config.Defaults.DateFormat
+
+	createdAtOutput := ""
+	if timeFormat == "" || timeFormat == "relative" {
+		createdAtOutput = utils.TimeElapsed(issue.Data.CreatedAt)
+	} else {
+		createdAtOutput = issue.Data.CreatedAt.Format(timeFormat)
+	}
+
+	return issue.getTextStyle().Render(createdAtOutput)
+}
+
 func (issue *Issue) renderRepoName() string {
 	repoName := issue.Data.Repository.Name
 	return issue.getTextStyle().Render(repoName)
@@ -58,7 +73,7 @@ func (issue *Issue) renderTitle() string {
 }
 
 func (issue *Issue) renderOpenedBy() string {
-	return issue.getTextStyle().Render(issue.Data.Author.Login)
+	return issue.getTextStyle().Render(issue.Data.GetAuthor(issue.Ctx.Theme, issue.ShowAuthorIcon))
 }
 
 func (issue *Issue) renderAssignees() string {

@@ -10,7 +10,7 @@ import (
 var (
 	SearchHeight       = 3
 	FooterHeight       = 1
-	ExpandedHelpHeight = 14
+	ExpandedHelpHeight = 15
 	InputBoxHeight     = 8
 	SingleRuneWidth    = 4
 	MainContentPadding = 1
@@ -28,6 +28,7 @@ type CommonStyles struct {
 	WaitingGlyph  string
 	FailureGlyph  string
 	SuccessGlyph  string
+	CommentGlyph  string
 }
 
 func BuildStyles(theme theme.Theme) CommonStyles {
@@ -53,6 +54,9 @@ func BuildStyles(theme theme.Theme) CommonStyles {
 	s.SuccessGlyph = lipgloss.NewStyle().
 		Foreground(theme.SuccessText).
 		Render(constants.SuccessIcon)
+	s.CommentGlyph = lipgloss.NewStyle().
+		Foreground(theme.PrimaryText).
+		Render(constants.CommentIcon)
 
 	return s
 }

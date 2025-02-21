@@ -31,6 +31,7 @@ func NewModel(
 	ctx *context.ProgramContext,
 	cfg config.PrsSectionConfig,
 	lastUpdated time.Time,
+	createdAt time.Time,
 ) Model {
 	m := Model{}
 	m.BaseModel = section.NewModel(
@@ -43,6 +44,7 @@ func NewModel(
 			Singular:    m.GetItemSingularForm(),
 			Plural:      m.GetItemPluralForm(),
 			LastUpdated: lastUpdated,
+			CreatedAt:   createdAt,
 		},
 	)
 	m.Prs = []data.PullRequestData{}
@@ -117,6 +119,19 @@ func (m Model) Update(msg tea.Msg) (section.Section, tea.Cmd) {
 
 		case key.Matches(msg, keys.PRKeys.Diff):
 			cmd = m.diff()
+
+		case key.Matches(msg, keys.PRKeys.ToggleSmartFiltering):
+			if !m.HasRepoNameInConfiguredFilter() {
+				m.IsFilteredByCurrentRemote = !m.IsFilteredByCurrentRemote
+			}
+			searchValue := m.GetSearchValue()
+			if m.SearchValue != searchValue {
+				m.SearchValue = searchValue
+				m.SearchBar.SetValue(searchValue)
+				m.SetIsSearching(false)
+				m.ResetRows()
+				return &m, tea.Batch(m.FetchNextPageSectionRows()...)
+			}
 
 		case key.Matches(msg, keys.PRKeys.Checkout):
 			cmd, err = m.checkout()
@@ -203,6 +218,10 @@ func GetSectionColumns(
 		dLayout.UpdatedAt,
 		sLayout.UpdatedAt,
 	)
+	createdAtLayout := config.MergeColumnConfigs(
+		dLayout.CreatedAt,
+		sLayout.CreatedAt,
+	)
 	repoLayout := config.MergeColumnConfigs(dLayout.Repo, sLayout.Repo)
 	titleLayout := config.MergeColumnConfigs(dLayout.Title, sLayout.Title)
 	authorLayout := config.MergeColumnConfigs(dLayout.Author, sLayout.Author)
@@ -258,9 +277,14 @@ func GetSectionColumns(
 				Hidden: linesLayout.Hidden,
 			},
 			{
-				Title:  "",
+				Title:  "󱦻",
 				Width:  updatedAtLayout.Width,
 				Hidden: updatedAtLayout.Hidden,
+			},
+			{
+				Title:  "󱡢",
+				Width:  createdAtLayout.Width,
+				Hidden: createdAtLayout.Hidden,
 			},
 		}
 	}
@@ -313,9 +337,14 @@ func GetSectionColumns(
 			Hidden: linesLayout.Hidden,
 		},
 		{
-			Title:  "",
+			Title:  "󱦻",
 			Width:  updatedAtLayout.Width,
 			Hidden: updatedAtLayout.Hidden,
+		},
+		{
+			Title:  "󱡢",
+			Width:  createdAtLayout.Width,
+			Hidden: createdAtLayout.Hidden,
 		},
 	}
 }
@@ -325,7 +354,7 @@ func (m Model) BuildRows() []table.Row {
 	currItem := m.Table.GetCurrItem()
 	for i, currPr := range m.Prs {
 		i := i
-		prModel := pr.PullRequest{Ctx: m.Ctx, Data: &currPr, Columns: m.Table.Columns}
+		prModel := pr.PullRequest{Ctx: m.Ctx, Data: &currPr, Columns: m.Table.Columns, ShowAuthorIcon: m.ShowAuthorIcon}
 		rows = append(
 			rows,
 			prModel.ToTableRow(currItem == i),
@@ -444,11 +473,15 @@ func FetchAllSections(
 			ctx,
 			sectionConfig,
 			time.Now(),
+			time.Now(),
 		)
 		if len(prs) > 0 && len(prs) >= i+1 && prs[i+1] != nil {
 			oldSection := prs[i+1].(*Model)
 			sectionModel.Prs = oldSection.Prs
 			sectionModel.LastFetchTaskId = oldSection.LastFetchTaskId
+		}
+		if sectionConfig.Layout.AuthorIcon.Hidden != nil {
+			sectionModel.ShowAuthorIcon = !*sectionConfig.Layout.AuthorIcon.Hidden
 		}
 		sections = append(sections, &sectionModel)
 		fetchPRsCmds = append(
